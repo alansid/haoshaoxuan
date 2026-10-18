@@ -5,3 +5,7 @@
 
 [build.environment]
   NODE_VERSION = "22"
+
+# 明確掛上 Next.js 執行環境；沒有它只會上傳靜態檔，頁面全部 404
+[[plugins]]
+  package = "@netlify/plugin-nextjs"
