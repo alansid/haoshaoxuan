@@ -1,7 +1,8 @@
 import Anthropic from "@anthropic-ai/sdk";
 import { AI_NAME_FULL } from "./brand";
 import type { Suggestion } from "./recommend";
-import { GOAL_LABELS, MEAL_TYPE_LABELS, VENUE_LABELS, type MealLog, type Profile } from "./types";
+import { dailyRange, mealRange } from "./energy";
+import { ACTIVITY_LABELS, GOAL_LABELS, MEAL_TYPE_LABELS, MEAL_TYPES, SEX_LABELS, VENUE_LABELS, type MealLog, type Profile } from "./types";
 
 export const MODEL = process.env.ANTHROPIC_MODEL || "claude-opus-5-5";
 
@@ -26,6 +27,25 @@ export function profileContext(profile: Profile, { includeName = true } = {}): s
     `常吃：${profile.venues.map((v) => VENUE_LABELS[v]).join("、")}`,
   ];
   if (profile.restrictions) lines.push(`飲食限制：${profile.restrictions}`);
+  const b = profile.body;
+  const bodyParts = [
+    b.heightCm !== null && `身高 ${b.heightCm} cm`,
+    b.weightKg !== null && `體重 ${b.weightKg} kg`,
+    b.age !== null && `${b.age} 歲`,
+    b.sex !== null && `性別 ${SEX_LABELS[b.sex]}`,
+    b.activity !== null && `活動量 ${ACTIVITY_LABELS[b.activity]}`,
+  ].filter(Boolean);
+  if (bodyParts.length) lines.push(`個人資料：${bodyParts.join("、")}`);
+  const range = dailyRange(b, profile.goal);
+  if (range) {
+    const meals = MEAL_TYPES.map((m) => {
+      const r = mealRange(b, profile.goal, m)!;
+      return `${MEAL_TYPE_LABELS[m]} ${r.min}–${r.max}`;
+    }).join("、");
+    lines.push(`估算的每日建議熱量：約 ${range.min}–${range.max} 大卡（各餐約：${meals}）。給份量建議時以此為參考，並說明是估算`);
+  } else {
+    lines.push("沒有足夠的個人資料估算熱量需求，請給一般性的份量建議");
+  }
   return `使用者的設定：\n${lines.join("\n")}`;
 }
 

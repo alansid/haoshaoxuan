@@ -44,6 +44,16 @@ describe("recommend", () => {
   });
 });
 
+describe("個人熱量範圍", () => {
+  it("範圍越低，推薦的熱量越低，理由寫「你這餐的建議範圍」", () => {
+    const [low] = recommend({ venue: "bento", budget: 300, mealType: "lunch", avoid: [], kcalRange: { min: 350, max: 450 } });
+    const [high] = recommend({ venue: "bento", budget: 300, mealType: "lunch", avoid: [], kcalRange: { min: 750, max: 900 } });
+    expect(low.kcalEst).toBeLessThan(high.kcalEst);
+    const inRange = recommend({ venue: "convenience", budget: 300, mealType: "lunch", avoid: [], kcalRange: { min: 400, max: 600 } }, 10);
+    expect(inRange.some((s) => s.reasons.some((r) => r.includes("你這餐") && r.includes("建議範圍")))).toBe(true);
+  });
+});
+
 describe("suggestionById", () => {
   it("可以從組合代號還原同一個組合", () => {
     for (const s of recommend({ venue: "cafe", budget: 300, mealType: "lunch", avoid: [] })) {

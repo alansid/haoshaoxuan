@@ -2,7 +2,9 @@ import Link from "next/link";
 import { Suspense } from "react";
 import { requireProfile } from "@/lib/auth";
 import { addDays, dayLabel, greeting, taipeiDay } from "@/lib/dates";
+import { dailyRange } from "@/lib/energy";
 import { VENUE_ICON } from "@/lib/links";
+import type { KcalRange } from "@/lib/recommend";
 import { formatTime } from "@/lib/meal-log-form";
 import { nextStreakBadge, streak, todaySummary } from "@/lib/stats";
 import { getStore } from "@/lib/store";
@@ -44,7 +46,32 @@ function StreakCard({ logs }: { logs: MealLog[] }) {
   );
 }
 
-function ProgressCard({ logs, dailyBudget }: { logs: MealLog[]; dailyBudget: number }) {
+function KcalLine({ kcal, unknown, range }: { kcal: number; unknown: boolean; range: KcalRange | null }) {
+  if (!range) {
+    return kcal > 0 ? (
+      <p className="text-xs text-muted">
+        熱量約 {kcal} kcal（估算{unknown ? "，部分餐點未估" : ""}）
+      </p>
+    ) : null;
+  }
+  const over = kcal > range.max;
+  return (
+    <div className="space-y-1 pt-1">
+      <p className="flex justify-between text-xs">
+        <span>今日熱量</span>
+        <span className={over ? "text-coral" : "text-muted"}>
+          約 {kcal} / 建議 {range.min}–{range.max} kcal
+        </span>
+      </p>
+      <div className="h-2 overflow-hidden rounded-full bg-ai-soft" aria-hidden>
+        <div className={`h-full rounded-full ${over ? "bg-coral" : "bg-ai"}`} style={{ width: `${Math.min(kcal / range.max, 1) * 100}%` }} />
+      </div>
+      <p className="text-[11px] text-muted">依你的個人資料估算{unknown ? "，部分餐點未估熱量" : ""}，僅供參考</p>
+    </div>
+  );
+}
+
+function ProgressCard({ logs, dailyBudget, kcalRange }: { logs: MealLog[]; dailyBudget: number; kcalRange: KcalRange | null }) {
   const s = todaySummary(logs, dailyBudget);
   const mainDone = MAIN_MEALS.filter((m) => s.meals.some((l) => l.mealType === m)).length;
   const ratio = Math.min(s.cost / dailyBudget, 1);
@@ -88,11 +115,7 @@ function ProgressCard({ logs, dailyBudget }: { logs: MealLog[]; dailyBudget: num
         <div className="h-2 overflow-hidden rounded-full bg-sun-soft" aria-hidden>
           <div className={`h-full rounded-full ${s.budgetLeft < 0 ? "bg-coral" : "bg-sun"}`} style={{ width: `${ratio * 100}%` }} />
         </div>
-        {s.kcal > 0 && (
-          <p className="text-xs text-muted">
-            熱量約 {s.kcal} kcal（估算{s.kcalUnknown ? "，部分餐點未估" : ""}）
-          </p>
-        )}
+        <KcalLine kcal={s.kcal} unknown={s.kcalUnknown} range={kcalRange} />
       </div>
     </section>
   );
@@ -187,7 +210,7 @@ async function Today() {
         </Link>
       )}
       <StreakCard logs={logs} />
-      <ProgressCard logs={logs} dailyBudget={profile.dailyBudget} />
+      <ProgressCard logs={logs} dailyBudget={profile.dailyBudget} kcalRange={dailyRange(profile.body, profile.goal)} />
       <MealList logs={logs} />
       <Suspense fallback={<div className="h-20 animate-pulse rounded-3xl bg-ai-soft" />}>
         <DailyTip profile={profile} logs={logs} />

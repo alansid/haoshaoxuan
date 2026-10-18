@@ -1,6 +1,6 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { taipeiDay } from "@/lib/dates";
-import type { Goal, MealLog, MealLogInput, MealType, Profile, ProfileInput, Venue } from "@/lib/types";
+import type { Activity, Goal, MealLog, MealLogInput, MealType, Profile, ProfileInput, Sex, Venue } from "@/lib/types";
 import type { AdminStore, PushSubscriptionJSON, Store } from "./types";
 
 type LogRow = {
@@ -27,6 +27,11 @@ type ProfileRow = {
   restrictions: string;
   onboarded: boolean;
   challenge: Profile["challenge"];
+  height_cm: number | null;
+  weight_kg: number | null;
+  sex: Sex | null;
+  age: number | null;
+  activity: Activity | null;
 };
 
 function logFromRow(r: LogRow): MealLog {
@@ -68,6 +73,14 @@ function profileFromRow(r: ProfileRow): Profile {
     restrictions: r.restrictions,
     onboarded: r.onboarded,
     challenge: r.challenge,
+    body: {
+      // numeric 欄位從資料庫回來可能是字串
+      heightCm: r.height_cm === null ? null : Number(r.height_cm),
+      weightKg: r.weight_kg === null ? null : Number(r.weight_kg),
+      sex: r.sex,
+      age: r.age,
+      activity: r.activity,
+    },
   };
 }
 
@@ -107,6 +120,11 @@ export class SupabaseStore implements Store {
         restrictions: input.restrictions,
         onboarded: input.onboarded,
         challenge: input.challenge,
+        height_cm: input.body.heightCm,
+        weight_kg: input.body.weightKg,
+        sex: input.body.sex,
+        age: input.body.age,
+        activity: input.body.activity,
         updated_at: new Date().toISOString(),
       })
       .select("*")

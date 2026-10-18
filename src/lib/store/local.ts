@@ -3,7 +3,7 @@ import { mkdir, readFile, rename, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { taipeiDay } from "@/lib/dates";
-import type { MealLog, MealLogInput, Profile, ProfileInput } from "@/lib/types";
+import { EMPTY_BODY, type MealLog, type MealLogInput, type Profile, type ProfileInput } from "@/lib/types";
 import type { AdminStore, PushSubscriptionJSON, Store } from "./types";
 
 type Data = {
@@ -57,7 +57,8 @@ export class LocalStore implements Store, AdminStore {
   }
 
   async getProfile(userId: string): Promise<Profile | null> {
-    return (await this.read()).profiles[userId] ?? null;
+    const profile = (await this.read()).profiles[userId];
+    return profile ? { ...profile, body: profile.body ?? EMPTY_BODY } : null;
   }
 
   saveProfile(userId: string, input: ProfileInput): Promise<Profile> {

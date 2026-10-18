@@ -35,3 +35,36 @@ describe("parseProfileForm", () => {
     expect(parseProfileForm(form(fields), base)).toEqual({ ok: false, error });
   });
 });
+
+describe("個人化資料", () => {
+  const body = (fields: Record<string, string>) => parseProfileForm(form({ bodySubmitted: "1", ...fields }), base);
+
+  it("全部留白就是不提供", () => {
+    expect(body({ heightCm: "", weightKg: "", age: "" })).toEqual({ ok: true, value: base });
+  });
+
+  it("正確的資料；身高體重可以有小數", () => {
+    const r = body({ heightCm: "172.5", weightKg: "68.25", age: "30", sex: "female", activity: "light" });
+    expect(r.ok && r.value.body).toEqual({ heightCm: 172.5, weightKg: 68.3, age: 30, sex: "female", activity: "light" });
+  });
+
+  it("不在選項內的性別、活動量視為未填", () => {
+    const r = body({ sex: "robot", activity: "extreme" });
+    expect(r.ok && r.value.body).toMatchObject({ sex: null, activity: null });
+  });
+
+  it.each([
+    [{ heightCm: "80" }, "身高請填 100–250 之間的數字"],
+    [{ weightKg: "abc" }, "體重請填 25–300 之間的數字"],
+    [{ age: "12" }, "年齡請填 13–100 的整數"],
+    [{ age: "30.5" }, "年齡請填 13–100 的整數"],
+  ])("錯誤輸入 %o", (fields, error) => {
+    expect(body(fields)).toEqual({ ok: false, error });
+  });
+
+  it("沒有 bodySubmitted 時不動個人資料", () => {
+    const withBody = { ...base, body: { heightCm: 170, weightKg: 60, age: 25, sex: null, activity: null } };
+    const r = parseProfileForm(form({ mealBudget: "200" }), withBody);
+    expect(r.ok && r.value.body).toEqual(withBody.body);
+  });
+});

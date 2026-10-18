@@ -3,7 +3,8 @@ import { requireProfile } from "@/lib/auth";
 import { mealTypeAt } from "@/lib/recommend";
 import { todaySummary } from "@/lib/stats";
 import { getStore } from "@/lib/store";
-import { MEAL_TYPE_LABELS, type MealType } from "@/lib/types";
+import { mealRange } from "@/lib/energy";
+import { MEAL_TYPE_LABELS, MEAL_TYPES, type MealType } from "@/lib/types";
 import { FindForm } from "./FindForm";
 
 async function Find({ searchParams }: PageProps<"/find">) {
@@ -21,6 +22,7 @@ async function Find({ searchParams }: PageProps<"/find">) {
         mealBudget={profile.mealBudget}
         budgetLeftToday={todaySummary(logs, profile.dailyBudget).budgetLeft}
         restrictions={profile.restrictions}
+        kcalRanges={Object.fromEntries(MEAL_TYPES.map((m) => [m, mealRange(profile.body, profile.goal, m)]))}
       />
     </>
   );

@@ -1,7 +1,8 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { Suspense } from "react";
-import { requireUser } from "@/lib/auth";
+import { requireProfile } from "@/lib/auth";
+import { mealRange } from "@/lib/energy";
 import { DISCLAIMER } from "@/lib/brand";
 import { suggestionById } from "@/lib/recommend";
 import { MEAL_TYPE_LABELS, VENUE_LABELS, type MealType } from "@/lib/types";
@@ -11,9 +12,9 @@ import { AiSwaps } from "./AiSwaps";
 async function Detail({ params, searchParams }: PageProps<"/find/[id]">) {
   const [{ id }, { meal }] = await Promise.all([params, searchParams]);
   const comboId = decodeURIComponent(id);
-  await requireUser(`/find/${id}`);
+  const { profile } = await requireProfile(`/find/${id}`);
   const mealType: MealType = typeof meal === "string" && meal in MEAL_TYPE_LABELS ? (meal as MealType) : "lunch";
-  const s = suggestionById(comboId, mealType);
+  const s = suggestionById(comboId, mealType, mealRange(profile.body, profile.goal, mealType));
   if (!s) notFound();
 
   const question = `${VENUE_LABELS[s.venue]}的「${s.items.map((i) => i.name).join("＋")}」適合我嗎？可以怎麼調整？`;

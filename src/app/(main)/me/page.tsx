@@ -4,7 +4,10 @@ import { AI_NAME, DISCLAIMER } from "@/lib/brand";
 import { isDevMode } from "@/lib/config";
 import { badges } from "@/lib/stats";
 import { getStore } from "@/lib/store";
+import { dailyRange } from "@/lib/energy";
 import { logoutAction } from "../../login/actions";
+import { clearBodyAction } from "./actions";
+import { BodyFields } from "./BodyFields";
 import { ProfileFields } from "./ProfileFields";
 import { PushToggle } from "./PushToggle";
 import { SettingsForm } from "./SettingsForm";
@@ -13,6 +16,8 @@ async function Me() {
   const { user, profile } = await requireProfile("/me");
   const logs = await (await getStore()).listLogs(user.id);
   const earned = badges(logs, profile.dailyBudget);
+  const range = dailyRange(profile.body, profile.goal);
+  const hasBody = Object.values(profile.body).some((v) => v !== null);
 
   return (
     <div className="space-y-4">
@@ -53,6 +58,26 @@ async function Me() {
       <SettingsForm>
         <ProfileFields profile={profile} showName />
       </SettingsForm>
+
+      <section className="space-y-3">
+        <div>
+          <h2 className="font-bold">個人資料</h2>
+          <p className="text-sm text-muted">
+            {range ? `依你的資料，每日建議約 ${range.min}–${range.max} kcal（估算，${DISCLAIMER}）` : "填身高、體重、年齡，伊緹就能估算你的每日建議熱量"}
+          </p>
+        </div>
+        {/* 清除或儲存後依新資料重新建立表單，避免輸入框留著舊值 */}
+        <SettingsForm key={JSON.stringify(profile.body)} submitLabel="儲存個人資料">
+          <BodyFields body={profile.body} />
+        </SettingsForm>
+        {hasBody && (
+          <form action={clearBodyAction} className="text-center">
+            <button type="submit" className="text-sm text-coral underline">
+              清除個人資料
+            </button>
+          </form>
+        )}
+      </section>
 
       <details className="card text-sm">
         <summary className="cursor-pointer font-medium">關於與免責聲明</summary>

@@ -81,3 +81,16 @@ describe("profileContext", () => {
     expect(profileContext(profile, { includeName: false })).not.toContain("小明");
   });
 });
+
+describe("profileContext 個人資料", () => {
+  it("有完整資料時附上每日與各餐建議熱量；沒有時說明給一般建議", async () => {
+    const { profileContext } = await import("./ai");
+    const profile = defaultProfile("u", "小明");
+    expect(profileContext(profile)).toContain("給一般性的份量建議");
+    const withBody = { ...profile, body: { heightCm: 175, weightKg: 70, age: 30, sex: "male" as const, activity: "sedentary" as const } };
+    const text = profileContext(withBody);
+    expect(text).toContain("身高 175 cm");
+    expect(text).toContain("估算的每日建議熱量");
+    expect(text).toContain("午餐");
+  });
+});

@@ -1,5 +1,19 @@
 import { DEFAULT_MEAL_BUDGET } from "./recommend";
-import { GOAL_LABELS, VENUE_LABELS, VENUES, type Goal, type Profile, type ProfileInput, type Venue } from "./types";
+import {
+  ACTIVITY_LABELS,
+  EMPTY_BODY,
+  GOAL_LABELS,
+  SEX_LABELS,
+  VENUE_LABELS,
+  VENUES,
+  type Activity,
+  type Body,
+  type Goal,
+  type Profile,
+  type ProfileInput,
+  type Sex,
+  type Venue,
+} from "./types";
 
 /** 每日外食預算預設值（PO 確認：三餐外食 900 元） */
 export const DEFAULT_DAILY_BUDGET = 900;
@@ -15,6 +29,7 @@ export function defaultProfile(userId: string, displayName: string): Profile {
     restrictions: "",
     onboarded: false,
     challenge: null,
+    body: EMPTY_BODY,
   };
 }
 
@@ -52,10 +67,40 @@ export function parseProfileForm(form: FormData, current: Profile): { ok: true; 
     if (venues.length === 0) return { ok: false, error: "常吃類型至少選一個" };
     next.venues = venues;
   }
+  if (form.has("bodySubmitted")) {
+    const body = parseBody(form);
+    if (typeof body === "string") return { ok: false, error: body };
+    next.body = body;
+  }
   if (form.has("restrictions")) {
     const r = String(form.get("restrictions")).trim();
     if (r.length > 100) return { ok: false, error: "飲食限制請在 100 字以內" };
     next.restrictions = r;
   }
   return { ok: true, value: next };
+}
+
+function optionalNumber(raw: FormDataEntryValue | null, label: string, min: number, max: number, integer: boolean): number | null | string {
+  const s = String(raw ?? "").trim();
+  if (s === "") return null;
+  const n = Number(s);
+  if (!Number.isFinite(n) || n < min || n > max || (integer && !Number.isInteger(n))) {
+    return `${label}請填 ${min}–${max}${integer ? " 的整數" : " 之間的數字"}`;
+  }
+  return integer ? n : Math.round(n * 10) / 10;
+}
+
+/** 個人化資料：全部選填，空白就是不提供 */
+export function parseBody(form: FormData): Body | string {
+  const heightCm = optionalNumber(form.get("heightCm"), "身高", 100, 250, false);
+  if (typeof heightCm === "string") return heightCm;
+  const weightKg = optionalNumber(form.get("weightKg"), "體重", 25, 300, false);
+  if (typeof weightKg === "string") return weightKg;
+  const age = optionalNumber(form.get("age"), "年齡", 13, 100, true);
+  if (typeof age === "string") return age;
+  const sexRaw = String(form.get("sex") ?? "");
+  const sex = sexRaw in SEX_LABELS ? (sexRaw as Sex) : null;
+  const activityRaw = String(form.get("activity") ?? "");
+  const activity = activityRaw in ACTIVITY_LABELS ? (activityRaw as Activity) : null;
+  return { heightCm, weightKg, age, sex, activity };
 }

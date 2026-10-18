@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useState } from "react";
 import { logHref, VENUE_ICON } from "@/lib/links";
-import { parseAvoid, recommend } from "@/lib/recommend";
+import { parseAvoid, recommend, type KcalRange } from "@/lib/recommend";
 import { MEAL_TYPE_LABELS, MEAL_TYPES, VENUE_LABELS, VENUES, type MealType, type Venue } from "@/lib/types";
 
 const CARD_BG = ["bg-accent-soft", "bg-sun-soft", "bg-coral-soft"];
@@ -14,9 +14,11 @@ type Props = {
   mealBudget: number;
   budgetLeftToday: number;
   restrictions: string;
+  /** 各餐的個人建議熱量範圍；沒有個人資料時為 null */
+  kcalRanges: Record<string, KcalRange | null>;
 };
 
-export function FindForm({ initialVenue, initialMeal, mealBudget, budgetLeftToday, restrictions }: Props) {
+export function FindForm({ initialVenue, initialMeal, mealBudget, budgetLeftToday, restrictions, kcalRanges }: Props) {
   const [venue, setVenue] = useState<Venue>(initialVenue);
   const [meal, setMeal] = useState<MealType>(initialMeal);
   const [budgetText, setBudgetText] = useState(String(mealBudget));
@@ -24,7 +26,7 @@ export function FindForm({ initialVenue, initialMeal, mealBudget, budgetLeftToda
 
   const budget = Number(budgetText);
   const budgetValid = Number.isInteger(budget) && budget > 0 && budget <= 10_000;
-  const suggestions = budgetValid ? recommend({ venue, budget, mealType: meal, avoid: parseAvoid(restrictions) }, limit) : [];
+  const suggestions = budgetValid ? recommend({ venue, budget, mealType: meal, avoid: parseAvoid(restrictions), kcalRange: kcalRanges[meal] }, limit) : [];
 
   return (
     <div className="space-y-4">
@@ -72,6 +74,11 @@ export function FindForm({ initialVenue, initialMeal, mealBudget, budgetLeftToda
           今天外食預算還剩{" "}
           <span className={budgetLeftToday < 0 ? "font-medium text-coral" : "font-medium text-accent"}>{budgetLeftToday} 元</span>
         </p>
+        {kcalRanges[meal] && (
+          <p className="w-full text-xs text-ai">
+            ✦ 依你的資料，這餐建議約 {kcalRanges[meal]!.min}–{kcalRanges[meal]!.max} kcal
+          </p>
+        )}
         {!budgetValid && <p className="w-full text-xs text-coral">預算請輸入 1–10000 的整數</p>}
       </div>
 

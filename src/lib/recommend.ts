@@ -17,7 +17,11 @@ export type RecommendInput = {
   mealType: MealType;
   /** 不想吃的食物關鍵字，品名包含任一關鍵字就排除 */
   avoid: string[];
+  /** 個人這餐的建議熱量範圍；沒有時用 KCAL_RANGES 的一般參考 */
+  kcalRange?: KcalRange | null;
 };
+
+export type KcalRange = { min: number; max: number };
 
 export type Suggestion = {
   /** 組合代號，例如 "cv-salad-chicken+cv-tea-egg"，用於組合詳情頁網址 */
@@ -53,8 +57,7 @@ function available(venue: Venue, avoid: string[]): MenuItem[] {
 const sum = (items: MenuItem[], key: "priceEst" | "kcalEst" | "proteinG") => items.reduce((s, i) => s + i[key], 0);
 const hasTag = (items: MenuItem[], tag: MenuItem["tags"][number]) => items.some((i) => i.tags.includes(tag));
 
-function score(items: MenuItem[], mealType: MealType): number {
-  const range = KCAL_RANGES[mealType];
+function score(items: MenuItem[], mealType: MealType, range: KcalRange = KCAL_RANGES[mealType]): number {
   const target = (range.min + range.max) / 2;
   const kcal = sum(items, "kcalEst");
   const protein = sum(items, "proteinG");
@@ -70,8 +73,7 @@ function score(items: MenuItem[], mealType: MealType): number {
   return s;
 }
 
-function describe(items: MenuItem[], mealType: MealType) {
-  const range = KCAL_RANGES[mealType];
+function describe(items: MenuItem[], mealType: MealType, range: KcalRange, personal: boolean) {
   const kcal = sum(items, "kcalEst");
   const protein = sum(items, "proteinG");
   const reasons: string[] = [];
@@ -81,7 +83,7 @@ function describe(items: MenuItem[], mealType: MealType) {
     tags.push("高蛋白");
   }
   if (kcal >= range.min && kcal <= range.max) {
-    reasons.push(`熱量約 ${kcal} 大卡，落在這餐 ${range.min}–${range.max} 大卡的參考範圍`);
+    reasons.push(`熱量約 ${kcal} 大卡，落在${personal ? "你" : ""}這餐 ${range.min}–${range.max} 大卡的${personal ? "建議" : "參考"}範圍`);
     tags.push("份量剛好");
   } else if (kcal < range.min) {
     reasons.push(`熱量約 ${kcal} 大卡，偏輕，餓的話可以加一份蛋白質`);
@@ -101,7 +103,7 @@ function describe(items: MenuItem[], mealType: MealType) {
   return { reasons, tags: tags.slice(0, 3), highlight };
 }
 
-function toSuggestion(items: MenuItem[], mealType: MealType): Suggestion {
+function toSuggestion(items: MenuItem[], mealType: MealType, kcalRange?: KcalRange | null): Suggestion {
   return {
     id: items.map((i) => i.id).join("+"),
     venue: items[0].venue,
@@ -109,11 +111,11 @@ function toSuggestion(items: MenuItem[], mealType: MealType): Suggestion {
     totalPrice: sum(items, "priceEst"),
     kcalEst: sum(items, "kcalEst"),
     proteinG: sum(items, "proteinG"),
-    ...describe(items, mealType),
+    ...describe(items, mealType, kcalRange ?? KCAL_RANGES[mealType], Boolean(kcalRange)),
   };
 }
 
-export function recommend({ venue, budget, mealType, avoid }: RecommendInput, limit = 3): Suggestion[] {
+export function recommend({ venue, budget, mealType, avoid, kcalRange }: RecommendInput, limit = 3): Suggestion[] {
   const pool = available(venue, avoid);
   const mains = pool.filter((i) => i.role === "main");
   const sides: (MenuItem | null)[] = [null, ...pool.filter((i) => i.role === "side")];
@@ -125,7 +127,7 @@ export function recommend({ venue, budget, mealType, avoid }: RecommendInput, li
       for (const drink of drinks) {
         const items = [main, side, drink].filter((i): i is MenuItem => i !== null);
         if (sum(items, "priceEst") > budget) continue;
-        combos.push({ items, score: score(items, mealType) });
+        combos.push({ items, score: score(items, mealType, kcalRange ?? undefined) });
       }
     }
   }
@@ -138,21 +140,21 @@ export function recommend({ venue, budget, mealType, avoid }: RecommendInput, li
     const main = combo.items[0];
     if (seenMains.has(main.id)) continue;
     seenMains.add(main.id);
-    result.push(toSuggestion(combo.items, mealType));
+    result.push(toSuggestion(combo.items, mealType, kcalRange));
     if (result.length >= limit) break;
   }
   return result;
 }
 
 /** 由組合代號還原組合；代號無效（品項不存在、混了不同場合）時回傳 null */
-export function suggestionById(id: string, mealType: MealType = "lunch"): Suggestion | null {
+export function suggestionById(id: string, mealType: MealType = "lunch", kcalRange?: KcalRange | null): Suggestion | null {
   const ids = id.split("+");
   if (ids.length === 0 || ids.length > 5) return null;
   const items = ids.map((x) => CATALOG.find((i) => i.id === x));
   if (items.some((i) => !i)) return null;
   const found = items as MenuItem[];
   if (new Set(found.map((i) => i.venue)).size !== 1) return null;
-  return toSuggestion(found, mealType);
+  return toSuggestion(found, mealType, kcalRange);
 }
 
 /** 同一種場合裡，油炸或含糖品項的較佳替換 */

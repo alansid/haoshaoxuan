@@ -62,6 +62,34 @@ export const GOAL_LABELS: Record<Goal, string> = {
   gain: "增肌",
 };
 
+export type Sex = "male" | "female" | "undisclosed";
+
+export const SEX_LABELS: Record<Sex, string> = {
+  male: "男",
+  female: "女",
+  undisclosed: "不透露",
+};
+
+export type Activity = "sedentary" | "light" | "moderate" | "active";
+
+export const ACTIVITY_LABELS: Record<Activity, string> = {
+  sedentary: "久坐",
+  light: "輕度",
+  moderate: "中度",
+  active: "高度",
+};
+
+/** 個人化資料，全部選填 */
+export type Body = {
+  heightCm: number | null;
+  weightKg: number | null;
+  sex: Sex | null;
+  age: number | null;
+  activity: Activity | null;
+};
+
+export const EMPTY_BODY: Body = { heightCm: null, weightKg: null, sex: null, age: null, activity: null };
+
 export type Profile = {
   userId: string;
   displayName: string;
@@ -75,6 +103,7 @@ export type Profile = {
   onboarded: boolean;
   /** 已接受的每週挑戰；week 是該週週一的日期（台灣時間） */
   challenge: { week: string; text: string } | null;
+  body: Body;
 };
 
 export type ProfileInput = Omit<Profile, "userId">;

@@ -7,6 +7,7 @@ import { taipeiDay, weekStart } from "@/lib/dates";
 import { parseProfileForm } from "@/lib/profile";
 import { weeklyChallenge } from "@/lib/stats";
 import { getStore } from "@/lib/store";
+import { EMPTY_BODY } from "@/lib/types";
 
 export type ProfileState = { error?: string; saved?: boolean };
 
@@ -27,6 +28,12 @@ export async function finishOnboardingAction(_prev: ProfileState, form: FormData
   revalidatePath("/", "layout");
   const next = String(form.get("next") ?? "");
   redirect(next.startsWith("/") && !next.startsWith("//") ? next : "/");
+}
+
+export async function clearBodyAction(): Promise<void> {
+  const { user, profile } = await requireProfile("/me");
+  await (await getStore()).saveProfile(user.id, { ...profile, body: EMPTY_BODY });
+  revalidatePath("/", "layout");
 }
 
 /** 接受下週小挑戰：挑戰內容由伺服器依紀錄重算，不信任前端送來的文字 */
