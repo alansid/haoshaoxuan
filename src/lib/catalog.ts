@@ -1,7 +1,7 @@
 import type { MenuItem } from "./types";
 
-// 首版內建的範例餐點。價格、熱量、蛋白質都是估計值，不是任何店家的官方資料；
-// 畫面上一律標示「估計」。priceEst 為 null 的品項代表價格未知。
+// 內建的常見外食品項（固定品項清單）。價格、熱量、蛋白質都是估計值，不是任何店家的官方資料；
+// 畫面上一律標示「約」。
 export const CATALOG: MenuItem[] = [
   // 便利商店
   { id: "cv-chicken-breast", venue: "convenience", role: "main", name: "即食雞胸肉（原味）", priceEst: 65, kcalEst: 130, proteinG: 25, tags: ["high-protein"] },
@@ -16,7 +16,7 @@ export const CATALOG: MenuItem[] = [
   { id: "cv-veg-cup", venue: "convenience", role: "side", name: "生菜沙拉杯", priceEst: 49, kcalEst: 60, proteinG: 2, tags: ["veggie"] },
   { id: "cv-soy-milk", venue: "convenience", role: "drink", name: "無糖豆漿", priceEst: 30, kcalEst: 110, proteinG: 9, tags: ["high-protein"] },
   { id: "cv-milk-tea", venue: "convenience", role: "drink", name: "瓶裝奶茶", priceEst: 35, kcalEst: 280, proteinG: 4, tags: ["sugary"] },
-  { id: "cv-greek-yogurt", venue: "convenience", role: "side", name: "希臘優格（無糖）", priceEst: null, kcalEst: 110, proteinG: 10, tags: ["high-protein"] },
+  { id: "cv-greek-yogurt", venue: "convenience", role: "side", name: "希臘優格（無糖）", priceEst: 45, kcalEst: 110, proteinG: 10, tags: ["high-protein"] },
 
   // 咖啡廳
   { id: "cf-chicken-wrap", venue: "cafe", role: "main", name: "烤雞全麥捲餅", priceEst: 145, kcalEst: 420, proteinG: 28, tags: ["high-protein", "whole-grain"] },
@@ -42,5 +42,5 @@ export const CATALOG: MenuItem[] = [
   { id: "bt-tofu", venue: "bento", role: "side", name: "滷豆腐＋滷蛋", priceEst: 30, kcalEst: 180, proteinG: 14, tags: ["high-protein"] },
   { id: "bt-clear-soup", venue: "bento", role: "drink", name: "蔬菜清湯", priceEst: 30, kcalEst: 40, proteinG: 1, tags: ["veggie"] },
   { id: "bt-black-tea", venue: "bento", role: "drink", name: "紅茶（全糖）", priceEst: 25, kcalEst: 180, proteinG: 0, tags: ["sugary"] },
-  { id: "bt-fish-soup", venue: "bento", role: "drink", name: "虱目魚湯", priceEst: null, kcalEst: 150, proteinG: 15, tags: ["high-protein"] },
+  { id: "bt-fish-soup", venue: "bento", role: "drink", name: "虱目魚湯", priceEst: 50, kcalEst: 150, proteinG: 15, tags: ["high-protein"] },
 ];

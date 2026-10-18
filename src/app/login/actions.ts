@@ -1,13 +1,13 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { cookies } from "next/headers";
+import { cookies, headers } from "next/headers";
 import { redirect } from "next/navigation";
-import { DEV_USER_COOKIE } from "@/lib/auth";
+import { afterLoginPath, DEV_USER_COOKIE } from "@/lib/auth";
 import { isDevMode } from "@/lib/config";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 
-export type LoginState = { step: "email"; error?: string } | { step: "code"; email: string; error?: string };
+export type LoginState = { error?: string };
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
@@ -22,33 +22,34 @@ function safeNext(raw: FormDataEntryValue | null): string {
   return next.startsWith("/") && !next.startsWith("//") ? next : "/";
 }
 
-export async function requestCodeAction(_prev: LoginState, form: FormData): Promise<LoginState> {
-  const email = String(form.get("email") ?? "").trim().toLowerCase();
-  if (!EMAIL_RE.test(email)) return { step: "email", error: "請輸入正確的 email" };
-
-  if (isDevMode()) {
-    // 本機開發模式：不寄驗證碼，直接登入
-    (await cookies()).set(DEV_USER_COOKIE, email, { httpOnly: true, sameSite: "lax", path: "/" });
-    refreshAllPages();
-    redirect(safeNext(form.get("next")));
-  }
-
-  const supabase = await createSupabaseServerClient();
-  const { error } = await supabase!.auth.signInWithOtp({ email, options: { shouldCreateUser: true } });
-  if (error) return { step: "email", error: "寄送驗證碼失敗，請稍後再試" };
-  return { step: "code", email };
+async function siteOrigin(): Promise<string> {
+  if (process.env.SITE_URL) return process.env.SITE_URL.replace(/\/+$/, "");
+  const h = await headers();
+  const host = h.get("x-forwarded-host") ?? h.get("host");
+  const proto = h.get("x-forwarded-proto") ?? "https";
+  return `${proto}://${host}`;
 }
 
-export async function verifyCodeAction(_prev: LoginState, form: FormData): Promise<LoginState> {
-  const email = String(form.get("email") ?? "");
-  const token = String(form.get("code") ?? "").trim();
-  if (!/^\d{6,10}$/.test(token)) return { step: "code", email, error: "請輸入 email 收到的數字驗證碼" };
-
+export async function googleLoginAction(_prev: LoginState, form: FormData): Promise<LoginState> {
+  const next = safeNext(form.get("next"));
   const supabase = await createSupabaseServerClient();
-  const { error } = await supabase!.auth.verifyOtp({ email, token, type: "email" });
-  if (error) return { step: "code", email, error: "驗證碼錯誤或已過期" };
+  if (!supabase) return { error: "尚未設定登入服務" };
+  const { data, error } = await supabase.auth.signInWithOAuth({
+    provider: "google",
+    options: { redirectTo: `${await siteOrigin()}/auth/callback?next=${encodeURIComponent(next)}` },
+  });
+  if (error || !data.url) return { error: "登入失敗，請再試一次" };
+  redirect(data.url);
+}
+
+/** 本機開發模式：沒有 Google 登入，輸入任何 email 就當作已登入 */
+export async function devLoginAction(_prev: LoginState, form: FormData): Promise<LoginState> {
+  if (!isDevMode()) return { error: "只有本機開發模式可以使用" };
+  const email = String(form.get("email") ?? "").trim().toLowerCase();
+  if (!EMAIL_RE.test(email)) return { error: "請輸入正確的 email" };
+  (await cookies()).set(DEV_USER_COOKIE, email, { httpOnly: true, sameSite: "lax", path: "/" });
   refreshAllPages();
-  redirect(safeNext(form.get("next")));
+  redirect(await afterLoginPath(`dev:${email}`, safeNext(form.get("next"))));
 }
 
 export async function logoutAction(): Promise<void> {
@@ -58,5 +59,5 @@ export async function logoutAction(): Promise<void> {
     await (await createSupabaseServerClient())!.auth.signOut();
   }
   refreshAllPages();
-  redirect("/");
+  redirect("/login");
 }

@@ -1,12 +1,14 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
-import type { MealLog, MealLogInput, Venue } from "@/lib/types";
-import { taipeiDay, type Store } from "./types";
+import { taipeiDay } from "@/lib/dates";
+import type { Goal, MealLog, MealLogInput, MealType, Profile, ProfileInput, Venue } from "@/lib/types";
+import type { AdminStore, PushSubscriptionJSON, Store } from "./types";
 
-type Row = {
+type LogRow = {
   id: string;
   user_id: string;
+  meal_type: MealType;
   venue: Venue | null;
-  items: string;
+  items: string[];
   cost: number | null;
   kcal_est: number | null;
   eaten_at: string;
@@ -15,10 +17,23 @@ type Row = {
   updated_at: string;
 };
 
-function fromRow(r: Row): MealLog {
+type ProfileRow = {
+  user_id: string;
+  display_name: string;
+  goal: Goal;
+  meal_budget: number;
+  daily_budget: number;
+  venues: Venue[];
+  restrictions: string;
+  onboarded: boolean;
+  challenge: Profile["challenge"];
+};
+
+function logFromRow(r: LogRow): MealLog {
   return {
     id: r.id,
     userId: r.user_id,
+    mealType: r.meal_type,
     venue: r.venue,
     items: r.items,
     cost: r.cost,
@@ -30,8 +45,9 @@ function fromRow(r: Row): MealLog {
   };
 }
 
-function toRow(input: MealLogInput) {
+function logToRow(input: MealLogInput) {
   return {
+    meal_type: input.mealType,
     venue: input.venue,
     items: input.items,
     cost: input.cost,
@@ -41,6 +57,32 @@ function toRow(input: MealLogInput) {
   };
 }
 
+function profileFromRow(r: ProfileRow): Profile {
+  return {
+    userId: r.user_id,
+    displayName: r.display_name,
+    goal: r.goal,
+    mealBudget: r.meal_budget,
+    dailyBudget: r.daily_budget,
+    venues: r.venues,
+    restrictions: r.restrictions,
+    onboarded: r.onboarded,
+    challenge: r.challenge,
+  };
+}
+
+async function selectProfile(db: SupabaseClient, userId: string): Promise<Profile | null> {
+  const { data, error } = await db.from("profiles").select("*").eq("user_id", userId).maybeSingle();
+  if (error) throw error;
+  return data ? profileFromRow(data as ProfileRow) : null;
+}
+
+async function selectLogs(db: SupabaseClient, userId: string): Promise<MealLog[]> {
+  const { data, error } = await db.from("meal_logs").select("*").eq("user_id", userId).order("eaten_at", { ascending: false });
+  if (error) throw error;
+  return (data as LogRow[]).map(logFromRow);
+}
+
 /**
  * 用登入使用者自己的 session 存取資料庫，權限由資料表的 RLS 把關；
  * userId 參數只用來多加一層過濾，不是唯一的保護。
@@ -48,42 +90,61 @@ function toRow(input: MealLogInput) {
 export class SupabaseStore implements Store {
   constructor(private readonly db: SupabaseClient) {}
 
-  async listLogs(userId: string): Promise<MealLog[]> {
+  getProfile(userId: string): Promise<Profile | null> {
+    return selectProfile(this.db, userId);
+  }
+
+  async saveProfile(userId: string, input: ProfileInput): Promise<Profile> {
     const { data, error } = await this.db
-      .from("meal_logs")
+      .from("profiles")
+      .upsert({
+        user_id: userId,
+        display_name: input.displayName,
+        goal: input.goal,
+        meal_budget: input.mealBudget,
+        daily_budget: input.dailyBudget,
+        venues: input.venues,
+        restrictions: input.restrictions,
+        onboarded: input.onboarded,
+        challenge: input.challenge,
+        updated_at: new Date().toISOString(),
+      })
       .select("*")
-      .eq("user_id", userId)
-      .order("eaten_at", { ascending: false });
+      .single();
     if (error) throw error;
-    return (data as Row[]).map(fromRow);
+    return profileFromRow(data as ProfileRow);
+  }
+
+  listLogs(userId: string): Promise<MealLog[]> {
+    return selectLogs(this.db, userId);
   }
 
   async getLog(userId: string, id: string): Promise<MealLog | null> {
     const { data, error } = await this.db.from("meal_logs").select("*").eq("user_id", userId).eq("id", id).maybeSingle();
     if (error) throw error;
-    return data ? fromRow(data as Row) : null;
+    return data ? logFromRow(data as LogRow) : null;
   }
 
   async createLog(userId: string, input: MealLogInput): Promise<MealLog> {
     const { data, error } = await this.db
       .from("meal_logs")
-      .insert({ ...toRow(input), user_id: userId })
+      .insert({ ...logToRow(input), user_id: userId })
       .select("*")
       .single();
     if (error) throw error;
-    return fromRow(data as Row);
+    return logFromRow(data as LogRow);
   }
 
   async updateLog(userId: string, id: string, input: MealLogInput): Promise<MealLog | null> {
     const { data, error } = await this.db
       .from("meal_logs")
-      .update({ ...toRow(input), updated_at: new Date().toISOString() })
+      .update({ ...logToRow(input), updated_at: new Date().toISOString() })
       .eq("user_id", userId)
       .eq("id", id)
       .select("*")
       .maybeSingle();
     if (error) throw error;
-    return data ? fromRow(data as Row) : null;
+    return data ? logFromRow(data as LogRow) : null;
   }
 
   async deleteLog(userId: string, id: string): Promise<boolean> {
@@ -107,5 +168,64 @@ export class SupabaseStore implements Store {
     const { data, error } = await this.db.rpc("increment_chat_usage");
     if (error) throw error;
     return data as number;
+  }
+
+  async getDailyTip(userId: string, day: string): Promise<string | null> {
+    const { data, error } = await this.db.from("daily_tips").select("text").eq("user_id", userId).eq("day", day).maybeSingle();
+    if (error) throw error;
+    return (data as { text: string } | null)?.text ?? null;
+  }
+
+  async saveDailyTip(userId: string, day: string, text: string): Promise<void> {
+    const { error } = await this.db.from("daily_tips").upsert({ user_id: userId, day, text });
+    if (error) throw error;
+  }
+
+  async savePushSubscription(userId: string, sub: PushSubscriptionJSON): Promise<void> {
+    const { error } = await this.db
+      .from("push_subscriptions")
+      .upsert({ endpoint: sub.endpoint, user_id: userId, p256dh: sub.keys.p256dh, auth: sub.keys.auth });
+    if (error) throw error;
+  }
+
+  async deletePushSubscription(userId: string, endpoint: string): Promise<void> {
+    const { error } = await this.db.from("push_subscriptions").delete().eq("user_id", userId).eq("endpoint", endpoint);
+    if (error) throw error;
+  }
+
+  async hasPushSubscription(userId: string): Promise<boolean> {
+    const { count, error } = await this.db
+      .from("push_subscriptions")
+      .select("endpoint", { count: "exact", head: true })
+      .eq("user_id", userId);
+    if (error) throw error;
+    return (count ?? 0) > 0;
+  }
+}
+
+/** 用 service role 金鑰的 client（不受 RLS 限制），只給排程推播使用 */
+export class SupabaseAdminStore implements AdminStore {
+  constructor(private readonly db: SupabaseClient) {}
+
+  async listPushSubscriptions() {
+    const { data, error } = await this.db.from("push_subscriptions").select("endpoint, user_id, p256dh, auth");
+    if (error) throw error;
+    return (data as { endpoint: string; user_id: string; p256dh: string; auth: string }[]).map((r) => ({
+      userId: r.user_id,
+      subscription: { endpoint: r.endpoint, keys: { p256dh: r.p256dh, auth: r.auth } },
+    }));
+  }
+
+  async deletePushSubscriptionByEndpoint(endpoint: string): Promise<void> {
+    const { error } = await this.db.from("push_subscriptions").delete().eq("endpoint", endpoint);
+    if (error) throw error;
+  }
+
+  listLogs(userId: string): Promise<MealLog[]> {
+    return selectLogs(this.db, userId);
+  }
+
+  getProfile(userId: string): Promise<Profile | null> {
+    return selectProfile(this.db, userId);
   }
 }

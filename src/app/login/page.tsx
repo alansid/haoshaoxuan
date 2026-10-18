@@ -1,19 +1,24 @@
 import { Suspense } from "react";
+import { APP_NAME, APP_TAGLINE } from "@/lib/brand";
 import { isDevMode } from "@/lib/config";
 import { LoginForm } from "./LoginForm";
 
-export const metadata = { title: "登入｜外食減脂助手" };
+export const metadata = { title: `登入｜${APP_NAME}` };
 
 export default function LoginPage() {
   return (
-    <div className="mx-auto max-w-sm space-y-6">
-      <div>
-        <h1 className="text-2xl font-bold">登入</h1>
-        <p className="mt-1 text-sm text-muted">登入後，飲食紀錄會存在雲端，換手機或電腦也看得到。</p>
+    <main className="mx-auto flex min-h-dvh max-w-sm flex-col justify-center gap-10 px-6 py-10 text-center">
+      <div className="space-y-3">
+        <div className="mx-auto flex h-20 w-20 items-center justify-center rounded-[28px] bg-accent text-4xl shadow-sm" aria-hidden>
+          🌿
+        </div>
+        <h1 className="text-2xl font-bold">{APP_NAME}</h1>
+        <p className="text-muted">{APP_TAGLINE}</p>
       </div>
       <Suspense>
         <LoginForm devMode={isDevMode()} />
       </Suspense>
-    </div>
+      <p className="text-xs text-muted">登入即表示同意服務條款與隱私權政策</p>
+    </main>
   );
 }

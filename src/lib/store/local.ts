@@ -1,26 +1,38 @@
 import { randomUUID } from "node:crypto";
 import { mkdir, readFile, rename, writeFile } from "node:fs/promises";
+import { tmpdir } from "node:os";
 import path from "node:path";
-import type { MealLog, MealLogInput } from "@/lib/types";
-import { taipeiDay, type Store } from "./types";
+import { taipeiDay } from "@/lib/dates";
+import type { MealLog, MealLogInput, Profile, ProfileInput } from "@/lib/types";
+import type { AdminStore, PushSubscriptionJSON, Store } from "./types";
 
 type Data = {
+  profiles: Record<string, Profile>;
   logs: MealLog[];
   /** key: `${userId}|${day}` */
   chatUsage: Record<string, number>;
+  /** key: `${userId}|${day}` */
+  dailyTips: Record<string, string>;
+  pushSubscriptions: { userId: string; subscription: PushSubscriptionJSON }[];
 };
 
-/** 本機開發模式用：資料存在一個 JSON 檔，只適合單機開發與測試 */
-export class LocalStore implements Store {
+const EMPTY: Data = { profiles: {}, logs: [], chatUsage: {}, dailyTips: {}, pushSubscriptions: [] };
+
+// 部署環境（例如 Netlify）的程式目錄是唯讀的，只能寫暫存目錄，資料隨時可能消失
+const DEFAULT_FILE =
+  process.env.NODE_ENV === "production" ? path.join(tmpdir(), "haoshaoxuan-store.json") : path.join(process.cwd(), ".data", "store.json");
+
+/** 本機測試模式用：資料存在一個 JSON 檔，只適合單機開發與測試 */
+export class LocalStore implements Store, AdminStore {
   private queue: Promise<unknown> = Promise.resolve();
 
-  constructor(private readonly file: string = path.join(process.cwd(), ".data", "store.json")) {}
+  constructor(private readonly file: string = DEFAULT_FILE) {}
 
   private async read(): Promise<Data> {
     try {
-      return JSON.parse(await readFile(this.file, "utf8")) as Data;
+      return { ...EMPTY, ...(JSON.parse(await readFile(this.file, "utf8")) as Partial<Data>) };
     } catch (e) {
-      if ((e as NodeJS.ErrnoException).code === "ENOENT") return { logs: [], chatUsage: {} };
+      if ((e as NodeJS.ErrnoException).code === "ENOENT") return structuredClone(EMPTY);
       throw e;
     }
   }
@@ -42,6 +54,18 @@ export class LocalStore implements Store {
     });
     this.queue = run.catch(() => undefined);
     return run;
+  }
+
+  async getProfile(userId: string): Promise<Profile | null> {
+    return (await this.read()).profiles[userId] ?? null;
+  }
+
+  saveProfile(userId: string, input: ProfileInput): Promise<Profile> {
+    return this.mutate((data) => {
+      const profile: Profile = { ...input, userId };
+      data.profiles[userId] = profile;
+      return profile;
+    });
   }
 
   async listLogs(userId: string): Promise<MealLog[]> {
@@ -90,6 +114,45 @@ export class LocalStore implements Store {
       const key = `${userId}|${taipeiDay()}`;
       data.chatUsage[key] = (data.chatUsage[key] ?? 0) + 1;
       return data.chatUsage[key];
+    });
+  }
+
+  async getDailyTip(userId: string, day: string): Promise<string | null> {
+    return (await this.read()).dailyTips[`${userId}|${day}`] ?? null;
+  }
+
+  async saveDailyTip(userId: string, day: string, text: string): Promise<void> {
+    await this.mutate((data) => {
+      data.dailyTips[`${userId}|${day}`] = text;
+    });
+  }
+
+  async savePushSubscription(userId: string, sub: PushSubscriptionJSON): Promise<void> {
+    await this.mutate((data) => {
+      data.pushSubscriptions = data.pushSubscriptions.filter((s) => s.subscription.endpoint !== sub.endpoint);
+      data.pushSubscriptions.push({ userId, subscription: sub });
+    });
+  }
+
+  async deletePushSubscription(userId: string, endpoint: string): Promise<void> {
+    await this.mutate((data) => {
+      data.pushSubscriptions = data.pushSubscriptions.filter(
+        (s) => !(s.userId === userId && s.subscription.endpoint === endpoint),
+      );
+    });
+  }
+
+  async hasPushSubscription(userId: string): Promise<boolean> {
+    return (await this.read()).pushSubscriptions.some((s) => s.userId === userId);
+  }
+
+  async listPushSubscriptions() {
+    return (await this.read()).pushSubscriptions;
+  }
+
+  async deletePushSubscriptionByEndpoint(endpoint: string): Promise<void> {
+    await this.mutate((data) => {
+      data.pushSubscriptions = data.pushSubscriptions.filter((s) => s.subscription.endpoint !== endpoint);
     });
   }
 }

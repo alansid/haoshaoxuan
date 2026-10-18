@@ -1,6 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { logsContext, MAX_TURN_CHARS, MAX_TURNS, parseTurns } from "./chat";
-import type { MealLog } from "./types";
+import { extractMealTags, MAX_TURN_CHARS, MAX_TURNS, parseTurns } from "./chat";
 
 describe("parseTurns", () => {
   it("接受一問一答、以使用者結尾的對話", () => {
@@ -32,35 +31,20 @@ describe("parseTurns", () => {
   });
 });
 
-describe("logsContext", () => {
-  const log: MealLog = {
-    id: "1",
-    userId: "u",
-    venue: "bento",
-    items: "烤雞腿便當",
-    cost: 110,
-    kcalEst: 620,
-    eatenAt: "2026-10-18T04:30:00.000Z",
-    note: "飯半碗",
-    createdAt: "",
-    updatedAt: "",
-  };
-
-  it("沒有紀錄回傳 null", () => {
-    expect(logsContext([])).toBeNull();
+describe("extractMealTags", () => {
+  it("取出標記並從文字中移除", () => {
+    const r = extractMealTags("推薦這組 👇\n[[記錄:烤地瓜＋雞胸肉＋無糖綠茶|140|450]]\n其他問題再問我");
+    expect(r.meals).toEqual([{ items: ["烤地瓜", "雞胸肉", "無糖綠茶"], price: 140, kcal: 450 }]);
+    expect(r.text).toBe("推薦這組 👇\n\n其他問題再問我");
   });
 
-  it("每筆紀錄一行，包含場合、內容、花費、熱量與備註", () => {
-    const text = logsContext([log, { ...log, id: "2", venue: null, cost: null, kcalEst: null, note: "" }])!;
-    const lines = text.split("\n").filter((l) => l.startsWith("- "));
-    expect(lines).toHaveLength(2);
-    expect(lines[0]).toContain("便當店｜烤雞腿便當｜110 元｜約 620 大卡｜備註：飯半碗");
-    expect(lines[1]).toContain("其他｜烤雞腿便當");
-    expect(lines[1]).not.toContain("元");
+  it("價格或熱量寫成「約 140 元」也能解析；空白或非數字為 null", () => {
+    expect(extractMealTags("[[記錄:飯糰+豆漿|約 70 元|]]").meals).toEqual([{ items: ["飯糰", "豆漿"], price: 70, kcal: null }]);
+    expect(extractMealTags("[[記錄:沙拉|不確定|abc]]").meals).toEqual([{ items: ["沙拉"], price: null, kcal: null }]);
   });
 
-  it("最多取 limit 筆", () => {
-    const logs = Array.from({ length: 30 }, (_, i) => ({ ...log, id: String(i) }));
-    expect(logsContext(logs, 5)!.split("\n").filter((l) => l.startsWith("- "))).toHaveLength(5);
+  it("可以有多個標記；沒有標記時原文不變", () => {
+    expect(extractMealTags("[[記錄:A|1|2]] 或 [[記錄:B|3|4]]").meals).toHaveLength(2);
+    expect(extractMealTags("沒有推薦")).toEqual({ text: "沒有推薦", meals: [] });
   });
 });

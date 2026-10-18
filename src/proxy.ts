@@ -3,11 +3,11 @@ import { NextResponse, type NextRequest } from "next/server";
 import { DEV_USER_COOKIE } from "@/lib/auth-cookie";
 import { supabaseConfig } from "@/lib/config";
 
-/** 需要登入的頁面；頁面與 Server Action 裡仍會再檢查一次 */
-const PROTECTED = ["/log", "/chat"];
+/** 不用登入就能看的頁面；其餘頁面都要登入（頁面與 Server Action 裡仍會再檢查一次） */
+const PUBLIC = ["/login", "/auth"];
 
 function isProtected(pathname: string): boolean {
-  return PROTECTED.some((p) => pathname === p || pathname.startsWith(`${p}/`));
+  return !PUBLIC.some((p) => pathname === p || pathname.startsWith(`${p}/`));
 }
 
 function toLogin(request: NextRequest): NextResponse {
@@ -46,5 +46,5 @@ export async function proxy(request: NextRequest) {
 }
 
 export const config = {
-  matcher: ["/((?!api/|_next/static|_next/image|favicon.ico|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$).*)"],
+  matcher: ["/((?!api/|_next/static|_next/image|favicon.ico|sw.js|manifest.webmanifest|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$).*)"],
 };

@@ -1,54 +1,58 @@
 import { describe, expect, it } from "vitest";
 import { CATALOG } from "./catalog";
-import { parseAvoid, recommend, swapsFor } from "./recommend";
-import type { Venue } from "./types";
-
-const VENUES: Venue[] = ["convenience", "cafe", "bento"];
+import { estimateKcal, KCAL_RANGES, mealTypeAt, parseAvoid, recommend, suggestionById, swapsFor } from "./recommend";
+import { MEAL_TYPES, VENUES } from "./types";
 
 describe("recommend", () => {
-  it.each(VENUES)("%s：預設 300 元預算有建議，且已知價格都在預算內", (venue) => {
-    const suggestions = recommend({ venue, budget: 300, avoid: [] });
-    expect(suggestions.length).toBeGreaterThan(0);
+  it.each(VENUES)("%s：預設 300 元預算有建議，且都在預算內", (venue) => {
+    const suggestions = recommend({ venue, budget: 300, mealType: "lunch", avoid: [] });
+    expect(suggestions.length).toBe(3);
     for (const s of suggestions) {
       expect(s.items.every((i) => i.venue === venue)).toBe(true);
-      if (s.totalPrice !== null) expect(s.totalPrice).toBeLessThanOrEqual(300);
+      expect(s.totalPrice).toBeLessThanOrEqual(300);
       expect(s.reasons.length).toBeGreaterThan(0);
+      expect(s.highlight).toBe(s.reasons[0]);
     }
   });
 
   it("每個建議的主餐都不同", () => {
-    const mains = recommend({ venue: "bento", budget: 300, avoid: [] }).map((s) => s.items[0].id);
+    const mains = recommend({ venue: "bento", budget: 300, mealType: "lunch", avoid: [] }, 10).map((s) => s.items[0].id);
     expect(new Set(mains).size).toBe(mains.length);
   });
 
-  it("價格未知的組合 totalPrice 為 null，不算出總價", () => {
-    const all = VENUES.flatMap((venue) => recommend({ venue, budget: 300, avoid: [] }, 20));
-    for (const s of all) {
-      const unknown = s.items.some((i) => i.priceEst === null);
-      expect(s.totalPrice === null).toBe(unknown);
-    }
-  });
-
   it("排除不想吃的關鍵字", () => {
-    const suggestions = recommend({ venue: "bento", budget: 300, avoid: ["雞"] }, 20);
+    const suggestions = recommend({ venue: "bento", budget: 300, mealType: "lunch", avoid: ["雞"] }, 20);
     expect(suggestions.length).toBeGreaterThan(0);
     for (const s of suggestions) expect(s.items.some((i) => i.name.includes("雞"))).toBe(false);
   });
 
-  it("預算低到買不起任何已知價格組合時，只剩價格未知的或沒有建議", () => {
-    const cheapest = Math.min(...CATALOG.filter((i) => i.role === "main" && i.priceEst !== null).map((i) => i.priceEst!));
-    for (const venue of VENUES) {
-      for (const s of recommend({ venue, budget: cheapest - 1, avoid: [] })) expect(s.totalPrice).toBeNull();
-    }
-  });
-
-  it.each(VENUES)("%s：預設預算下，推薦都是價格已知的組合", (venue) => {
-    for (const s of recommend({ venue, budget: 300, avoid: [] })) expect(s.totalPrice).not.toBeNull();
+  it("預算低於最便宜的主餐時沒有建議", () => {
+    const cheapest = Math.min(...CATALOG.filter((i) => i.role === "main").map((i) => i.priceEst));
+    for (const venue of VENUES) expect(recommend({ venue, budget: cheapest - 1, mealType: "lunch", avoid: [] })).toEqual([]);
   });
 
   it("減脂排序：便當店第一名不是油炸品", () => {
-    const [top] = recommend({ venue: "bento", budget: 300, avoid: [] });
+    const [top] = recommend({ venue: "bento", budget: 300, mealType: "lunch", avoid: [] });
     expect(top.items.some((i) => i.tags.includes("fried"))).toBe(false);
+  });
+
+  it("點心的推薦熱量比午餐低", () => {
+    const [snack] = recommend({ venue: "convenience", budget: 300, mealType: "snack", avoid: [] });
+    const [lunch] = recommend({ venue: "convenience", budget: 300, mealType: "lunch", avoid: [] });
+    expect(snack.kcalEst).toBeLessThan(lunch.kcalEst);
+    expect(snack.kcalEst).toBeLessThanOrEqual(KCAL_RANGES.snack.max + 100);
+  });
+});
+
+describe("suggestionById", () => {
+  it("可以從組合代號還原同一個組合", () => {
+    for (const s of recommend({ venue: "cafe", budget: 300, mealType: "lunch", avoid: [] })) {
+      expect(suggestionById(s.id)).toEqual(s);
+    }
+  });
+
+  it.each([["不存在-品項"], ["cv-chicken-breast+bt-tofu"], [""], ["a+b+c+d+e+f"]])("無效代號 %s 回傳 null", (id) => {
+    expect(suggestionById(id)).toBeNull();
   });
 });
 
@@ -62,6 +66,29 @@ describe("swapsFor", () => {
         expect(sw.kcalSaved).toBeGreaterThan(0);
       }
     }
+  });
+});
+
+describe("estimateKcal", () => {
+  it("品項都在清單裡才加總", () => {
+    expect(estimateKcal(["茶葉蛋 ×2", "無糖豆漿"])).toBe(150 + 110);
+    expect(estimateKcal(["茶葉蛋 ×2", "神秘料理"])).toBeNull();
+    expect(estimateKcal([])).toBeNull();
+  });
+});
+
+describe("mealTypeAt", () => {
+  it.each([
+    ["2026-10-18T00:30:00Z", "breakfast"],
+    ["2026-10-18T04:30:00Z", "lunch"],
+    ["2026-10-18T11:00:00Z", "dinner"],
+    ["2026-10-18T15:00:00Z", "snack"],
+  ])("%s（UTC）→ %s", (iso, meal) => {
+    expect(mealTypeAt(new Date(iso))).toBe(meal);
+  });
+
+  it("只回傳合法餐別", () => {
+    for (let h = 0; h < 24; h++) expect(MEAL_TYPES).toContain(mealTypeAt(new Date(Date.UTC(2026, 9, 18, h))));
   });
 });
 

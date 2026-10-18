@@ -1,24 +1,37 @@
 @import "tailwindcss";
 
+/* C-266「溫暖陪伴」：主色清新綠、珊瑚橘（連續天數、提醒）、暖黃（成就、預算）、紫（只用在 AI 內容）、米白底 */
 :root {
-  --background: #fafaf7;
-  --foreground: #1c1c1a;
+  --background: #f6f1e8;
+  --foreground: #2b2a26;
   --surface: #ffffff;
-  --muted: #6b6b66;
-  --border: #e4e4de;
-  --accent: #2f7d4f;
-  --accent-soft: #e6f2ea;
+  --muted: #7a766c;
+  --border: #ebe4d6;
+  --accent: #2f9a6a;
+  --accent-soft: #e3f3ea;
+  --coral: #ff7a59;
+  --coral-soft: #ffe9e2;
+  --sun: #ffb43d;
+  --sun-soft: #fff3dc;
+  --ai: #7b5cf0;
+  --ai-soft: #efeafe;
 }
 
 @media (prefers-color-scheme: dark) {
   :root {
-    --background: #121311;
-    --foreground: #ececea;
-    --surface: #1c1d1b;
-    --muted: #a0a09a;
-    --border: #2e2f2c;
-    --accent: #5dbb83;
-    --accent-soft: #1e2f24;
+    --background: #1a1916;
+    --foreground: #f0ede6;
+    --surface: #24231f;
+    --muted: #a8a397;
+    --border: #36342e;
+    --accent: #4cc08a;
+    --accent-soft: #1f3529;
+    --coral: #ff8c6e;
+    --coral-soft: #3a2621;
+    --sun: #ffc35e;
+    --sun-soft: #3a3020;
+    --ai: #a08bff;
+    --ai-soft: #2a2540;
   }
 }
 
@@ -30,6 +43,12 @@
   --color-border: var(--border);
   --color-accent: var(--accent);
   --color-accent-soft: var(--accent-soft);
+  --color-coral: var(--coral);
+  --color-coral-soft: var(--coral-soft);
+  --color-sun: var(--sun);
+  --color-sun-soft: var(--sun-soft);
+  --color-ai: var(--ai);
+  --color-ai-soft: var(--ai-soft);
   --font-sans: var(--font-noto-sans-tc), system-ui, sans-serif;
 }
 
@@ -40,15 +59,21 @@ body {
 
 @layer components {
   .input {
-    @apply w-full rounded-lg border border-border bg-surface px-3 py-2 text-base outline-none focus:border-accent;
+    @apply w-full rounded-xl border border-border bg-surface px-3 py-2.5 text-base outline-none focus:border-accent;
   }
   .btn-primary {
-    @apply rounded-lg bg-accent px-4 py-2 font-medium text-white disabled:opacity-60;
+    @apply rounded-2xl bg-accent px-4 py-2.5 font-medium text-white shadow-sm disabled:opacity-60;
   }
   .btn-secondary {
-    @apply rounded-lg border border-border bg-surface px-4 py-2 font-medium disabled:opacity-60;
+    @apply rounded-2xl border border-border bg-surface px-4 py-2.5 font-medium disabled:opacity-60;
   }
   .card {
-    @apply rounded-xl border border-border bg-surface p-4;
+    @apply rounded-3xl bg-surface p-4 shadow-[0_1px_3px_rgba(60,50,30,0.06)];
+  }
+  .chip {
+    @apply inline-flex items-center gap-1 rounded-full px-3 py-1.5 text-sm;
+  }
+  .tag {
+    @apply rounded-full px-2 py-0.5 text-xs;
   }
 }
