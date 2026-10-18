@@ -1,10 +1,13 @@
 import { Suspense } from "react";
 import { requireUser } from "@/lib/auth";
+import { taipeiDay } from "@/lib/dates";
 import { isoToTaipeiLocal } from "@/lib/meal-log-form";
 import { mealTypeAt, suggestionById } from "@/lib/recommend";
 import { MEAL_TYPE_LABELS, VENUE_LABELS, type MealType, type Venue } from "@/lib/types";
 import { createLogAction } from "../actions";
 import { LogForm } from "../LogForm";
+
+const TYPICAL_TIME: Record<MealType, string> = { breakfast: "08:00", lunch: "12:30", dinner: "18:30", snack: "15:30" };
 
 type Params = Awaited<PageProps<"/log/new">["searchParams"]>;
 
@@ -22,7 +25,11 @@ function prefill(params: Params) {
   const now = new Date();
   const meal = str(params.meal);
   const mealType: MealType = meal && meal in MEAL_TYPE_LABELS ? (meal as MealType) : mealTypeAt(now);
-  const base = { mealType, note: "", eatenAtLocal: isoToTaipeiLocal(now.toISOString()) };
+  // 補記今天稍早的餐別時，時間先帶那一餐的常見時刻（例如下午補記午餐 → 12:30）；不會帶入未來的時間
+  const nowLocal = isoToTaipeiLocal(now.toISOString());
+  const typical = `${taipeiDay(now)}T${TYPICAL_TIME[mealType]}`;
+  const eatenAtLocal = mealType !== mealTypeAt(now) && typical < nowLocal ? typical : nowLocal;
+  const base = { mealType, note: "", eatenAtLocal };
 
   const combo = str(params.combo);
   const s = combo ? suggestionById(combo, mealType) : null;
@@ -48,7 +55,9 @@ async function NewLog({ searchParams }: PageProps<"/log/new">) {
   const params = await searchParams;
   const query = new URLSearchParams(Object.entries(params).filter((e): e is [string, string] => typeof e[1] === "string")).toString();
   await requireUser(query ? `/log/new?${query}` : "/log/new");
-  return <LogForm action={createLogAction} title="記一餐" initial={prefill(params)} />;
+  const initial = prefill(params);
+  // 帶入的內容不同時重新建立表單；否則瀏覽器保留的上一份表單會沿用舊的品項與時間
+  return <LogForm key={JSON.stringify(initial)} action={createLogAction} title="記一餐" initial={initial} />;
 }
 
 export default function NewLogPage(props: PageProps<"/log/new">) {

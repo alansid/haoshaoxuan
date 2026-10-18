@@ -21,6 +21,13 @@ function hidePartialTag(text: string): string {
   return open !== -1 && !text.slice(open).includes("]]") ? text.slice(0, open) : text;
 }
 
+/** AI 偶爾還是會用 **粗體**：轉成粗體顯示，其他 Markdown 符號維持原樣 */
+function RichText({ text }: { text: string }) {
+  return text.split(/(\*\*[^*\n]+\*\*)/g).map((part, i) =>
+    part.startsWith("**") && part.endsWith("**") && part.length > 4 ? <strong key={i}>{part.slice(2, -2)}</strong> : part,
+  );
+}
+
 function AssistantBubble({ content, streaming }: { content: string; streaming: boolean }) {
   const { text, meals } = extractMealTags(hidePartialTag(content));
   return (
@@ -29,7 +36,7 @@ function AssistantBubble({ content, streaming }: { content: string; streaming: b
         🌿
       </span>
       <div className="max-w-[85%] space-y-2 rounded-3xl rounded-tl-md bg-surface px-4 py-3 text-sm shadow-[0_1px_3px_rgba(60,50,30,0.06)]">
-        <p className="whitespace-pre-wrap leading-relaxed">{text || (streaming ? `${AI_NAME}想一下…` : "")}</p>
+        <p className="whitespace-pre-wrap leading-relaxed">{text ? <RichText text={text} /> : streaming ? `${AI_NAME}想一下…` : ""}</p>
         {meals.map((m) => (
           <div key={m.items.join("+")} className="flex items-center gap-3 rounded-2xl bg-accent-soft p-3">
             <div className="min-w-0 flex-1">
@@ -146,7 +153,7 @@ export function Chat({ initialQuestion }: { initialQuestion: string }) {
         <div ref={bottomRef} />
       </div>
 
-      <div className="sticky bottom-20 space-y-2 bg-background pt-3">
+      <div className="sticky bottom-20 z-[5] space-y-2 bg-background pt-3">
         <div className="flex gap-2 overflow-x-auto pb-1">
           {SUGGESTIONS.map((q) => (
             <button key={q} type="button" onClick={() => send(q)} disabled={streaming} className="chip shrink-0 border border-border bg-surface">

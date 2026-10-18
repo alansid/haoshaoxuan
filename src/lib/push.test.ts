@@ -72,3 +72,12 @@ describe("sendWeeklyPush", () => {
     vi.doUnmock("web-push");
   });
 });
+
+describe("profileContext", () => {
+  it("每日一句這類會被存起來的內容不帶暱稱", async () => {
+    const { profileContext } = await import("./ai");
+    const profile = defaultProfile("u", "小明");
+    expect(profileContext(profile)).toContain("小明");
+    expect(profileContext(profile, { includeName: false })).not.toContain("小明");
+  });
+});

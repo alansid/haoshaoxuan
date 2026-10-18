@@ -98,46 +98,66 @@ function ProgressCard({ logs, dailyBudget }: { logs: MealLog[]; dailyBudget: num
   );
 }
 
-/** 「幫你挑」要推哪一餐：現在或之後還沒記的正餐；時間已過的早、午餐不再提示 */
-function nextMissingMeal(meals: MealLog[], now = new Date()): MealType | undefined {
+/** 現在的台灣時間已經過了哪幾餐：已過且沒記的顯示「補記」，下一餐顯示「幫你挑」 */
+function mealSlots(meals: MealLog[], now = new Date()) {
   const hour = (now.getUTCHours() + 8) % 24;
-  const upcoming: MealType[] = hour < 10 ? MAIN_MEALS : hour < 15 ? ["lunch", "dinner"] : hour < 22 ? ["dinner"] : [];
-  return upcoming.find((m) => !meals.some((l) => l.mealType === m));
+  const passed: Record<MealType, boolean> = { breakfast: hour >= 10, lunch: hour >= 15, dinner: hour >= 22, snack: false };
+  const missing = MAIN_MEALS.filter((m) => !meals.some((l) => l.mealType === m));
+  return {
+    backfill: missing.filter((m) => passed[m]),
+    next: missing.find((m) => !passed[m]),
+  };
+}
+
+function MealRow({ log }: { log: MealLog }) {
+  return (
+    <Link href={`/log/${log.id}/edit`} className="card flex items-center gap-3">
+      <span className="flex h-10 w-10 items-center justify-center rounded-2xl bg-sun-soft text-xl" aria-hidden>
+        {log.venue ? VENUE_ICON[log.venue] : "🍴"}
+      </span>
+      <span className="min-w-0 flex-1">
+        <span className="block text-sm font-medium">
+          {MEAL_TYPE_LABELS[log.mealType]}
+          {log.venue && ` · ${VENUE_LABELS[log.venue]}`}
+          <span className="ml-1 text-xs font-normal text-muted">{formatTime(log.eatenAt)}</span>
+        </span>
+        <span className="block truncate text-xs text-muted">{log.items.join("＋")}</span>
+      </span>
+      {log.cost !== null && <span className="font-medium tabular-nums">{log.cost}</span>}
+    </Link>
+  );
 }
 
 function MealList({ logs }: { logs: MealLog[] }) {
   const s = todaySummary(logs, 0);
-  const missing = nextMissingMeal(s.meals);
+  const { backfill, next } = mealSlots(s.meals);
 
   return (
     <section className="space-y-2">
-      {s.meals.length === 0 && (
-        <p className="card text-center text-sm text-muted">今天還沒記錄，先找一餐吧 🍽️</p>
-      )}
+      {s.meals.length === 0 && <p className="text-center text-sm text-muted">今天還沒記錄，先找一餐吧 🍽️</p>}
       {s.meals.map((l) => (
-        <Link key={l.id} href={`/log/${l.id}/edit`} className="card flex items-center gap-3">
-          <span className="flex h-10 w-10 items-center justify-center rounded-2xl bg-sun-soft text-xl" aria-hidden>
-            {l.venue ? VENUE_ICON[l.venue] : "🍴"}
+        <MealRow key={l.id} log={l} />
+      ))}
+      {backfill.map((m) => (
+        <Link key={m} href={`/log/new?meal=${m}`} className="card flex items-center gap-3 text-sm text-muted">
+          <span className="flex h-10 w-10 items-center justify-center rounded-2xl bg-background text-xl" aria-hidden>
+            ＋
           </span>
-          <span className="min-w-0 flex-1">
-            <span className="block text-sm font-medium">
-              {MEAL_TYPE_LABELS[l.mealType]}
-              {l.venue && ` · ${VENUE_LABELS[l.venue]}`}
-              <span className="ml-1 text-xs font-normal text-muted">{formatTime(l.eatenAt)}</span>
-            </span>
-            <span className="block truncate text-xs text-muted">{l.items.join("＋")}</span>
-          </span>
-          {l.cost !== null && <span className="font-medium tabular-nums">{l.cost}</span>}
+          <span className="flex-1">{MEAL_TYPE_LABELS[m]}還沒記錄</span>
+          <span className="font-medium text-accent">補記 ›</span>
         </Link>
       ))}
-      {missing && (
+      {next && (
         <Link
-          href={`/find?meal=${missing}`}
+          href={`/find?meal=${next}`}
           className="block rounded-3xl border-2 border-dashed border-accent/40 py-3 text-center text-sm font-medium text-accent"
         >
-          ＋ {MEAL_TYPE_LABELS[missing]}吃什麼？幫你挑
+          ＋ {MEAL_TYPE_LABELS[next]}吃什麼？幫你挑
         </Link>
       )}
+      <Link href="/log/new" className="block py-1 text-center text-sm text-muted underline">
+        記其他餐（點心、宵夜或之前的日子）
+      </Link>
     </section>
   );
 }
