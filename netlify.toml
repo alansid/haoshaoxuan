@@ -1,0 +1,7 @@
+# Netlify 會自動偵測 Next.js 並套用官方的 Next.js 執行環境
+[build]
+  command = "npm run build"
+  publish = ".next"
+
+[build.environment]
+  NODE_VERSION = "22"
