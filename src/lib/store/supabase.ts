@@ -62,6 +62,12 @@ function logToRow(input: MealLogInput) {
   };
 }
 
+function toNumberOrNull(v: unknown): number | null {
+  if (v === null || v === undefined || v === "") return null;
+  const n = Number(v);
+  return Number.isFinite(n) ? n : null;
+}
+
 function profileFromRow(r: ProfileRow): Profile {
   return {
     userId: r.user_id,
@@ -74,12 +80,12 @@ function profileFromRow(r: ProfileRow): Profile {
     onboarded: r.onboarded,
     challenge: r.challenge,
     body: {
-      // numeric 欄位從資料庫回來可能是字串
-      heightCm: r.height_cm === null ? null : Number(r.height_cm),
-      weightKg: r.weight_kg === null ? null : Number(r.weight_kg),
-      sex: r.sex,
-      age: r.age,
-      activity: r.activity,
+      // numeric 欄位從資料庫回來可能是字串；欄位不存在（migration 未套用）時是 undefined，一律當作沒填
+      heightCm: toNumberOrNull(r.height_cm),
+      weightKg: toNumberOrNull(r.weight_kg),
+      sex: r.sex ?? null,
+      age: toNumberOrNull(r.age),
+      activity: r.activity ?? null,
     },
   };
 }

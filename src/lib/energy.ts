@@ -26,13 +26,15 @@ const MEAL_SHARE: Record<MealType, number> = { breakfast: 0.25, lunch: 0.35, din
 
 const round50 = (n: number) => Math.round(n / 50) * 50;
 
-/** 身高、體重、年齡都有填才能估算；性別不透露時取男女公式的平均，活動量沒填當作久坐 */
+const isNum = (v: number | null | undefined): v is number => typeof v === "number" && Number.isFinite(v);
+
+/** 五項個人資料都填了才估算（UX 規格），任一項缺少就回傳 null；性別選「不透露」時取男女公式的平均 */
 export function dailyTarget(body: Body, goal: Goal): number | null {
   const { heightCm, weightKg, age, sex, activity } = body;
-  if (heightCm === null || weightKg === null || age === null) return null;
+  if (!isNum(heightCm) || !isNum(weightKg) || !isNum(age) || !sex || !activity) return null;
   const sexOffset = sex === "male" ? 5 : sex === "female" ? -161 : -78;
   const bmr = 10 * weightKg + 6.25 * heightCm - 5 * age + sexOffset;
-  const tdee = bmr * ACTIVITY_FACTOR[activity ?? "sedentary"];
+  const tdee = bmr * ACTIVITY_FACTOR[activity];
   return Math.max(MIN_DAILY_KCAL, Math.round(tdee * GOAL_FACTOR[goal]));
 }
 

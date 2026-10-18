@@ -48,11 +48,18 @@ function StreakCard({ logs }: { logs: MealLog[] }) {
 
 function KcalLine({ kcal, unknown, range }: { kcal: number; unknown: boolean; range: KcalRange | null }) {
   if (!range) {
-    return kcal > 0 ? (
-      <p className="text-xs text-muted">
-        熱量約 {kcal} kcal（估算{unknown ? "，部分餐點未估" : ""}）
-      </p>
-    ) : null;
+    return (
+      <>
+        {kcal > 0 && (
+          <p className="text-xs text-muted">
+            熱量約 {kcal} kcal（估算{unknown ? "，部分餐點未估" : ""}）
+          </p>
+        )}
+        <Link href="/me" className="block text-xs text-ai">
+          ✦ 填寫個人資料後，伊緹可以給你專屬建議 ›
+        </Link>
+      </>
+    );
   }
   const over = kcal > range.max;
   return (
@@ -60,7 +67,7 @@ function KcalLine({ kcal, unknown, range }: { kcal: number; unknown: boolean; ra
       <p className="flex justify-between text-xs">
         <span>今日熱量</span>
         <span className={over ? "text-coral" : "text-muted"}>
-          約 {kcal} / 建議 {range.min}–{range.max} kcal
+          {kcal > 0 ? `約 ${kcal} / ` : ""}建議 {range.min}–{range.max} kcal
         </span>
       </p>
       <div className="h-2 overflow-hidden rounded-full bg-ai-soft" aria-hidden>

@@ -23,8 +23,15 @@ describe("dailyTarget", () => {
     expect(dailyTarget({ ...body, activity: "active" }, "maintain")!).toBeGreaterThan(1979);
   });
 
-  it("活動量沒填當作久坐", () => {
-    expect(dailyTarget({ ...body, activity: null }, "maintain")).toBe(1979);
+  it("五項任一項缺少就不估算（包含性別、活動量）", () => {
+    expect(dailyTarget({ ...body, activity: null }, "maintain")).toBeNull();
+    expect(dailyTarget({ ...body, sex: null }, "maintain")).toBeNull();
+  });
+
+  it("資料庫回來的 undefined、NaN 都當作沒填，不會算出 NaN", () => {
+    const broken = { ...body, heightCm: undefined, weightKg: Number.NaN } as unknown as Body;
+    expect(dailyTarget(broken, "maintain")).toBeNull();
+    expect(dailyRange(broken, "maintain")).toBeNull();
   });
 
   it("身高、體重、年齡缺一就不估算", () => {
